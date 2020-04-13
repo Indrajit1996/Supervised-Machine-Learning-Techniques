@@ -1,0 +1,376 @@
+---
+title: "Simple Linear Regression"
+author: "INSOFE"
+date: "14th December, 2019"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+## Simple Linear Regression Model
+
+### Clear environment variables
+
+```{r}
+rm(list=ls(all=TRUE))
+
+```
+
+## Agenda 
+
+* Problem Statement
+
+* Get the data
+
+* Understand the data
+
+* Explore the data
+
+* Clean and Process the Data
+
+* Model the data
+
+* Evaluation and Communication
+
+## Problem Statement
+
+* We have provided a dataset with some details about cars. You are expected to build a linear regression model for the age and the price columns.
+
+### Define the independent and dependent variables
+
+- In Linear Regression, the dependent variable is continuous variable.
+- For Simple Linear Regression we need one dependent and one independent variable
+- For this example, we will consider the Price as dependent variable and the Age of the car as the independent variable.
+
+### Reading & understanding the data
+
+* Set working Directory and read the data from csv file
+
+```{r}
+# setwd("")
+cars_data = read.csv(file="Toyota_SimpleReg.csv", header=T)   # Read the data from Toyota_SimpleReg.csv file
+```
+
+
+# EDA - Exploratory Data Analysis
+* Look at the number of rows and columns
+* Column names
+* Look at the structure of the dataset using the function `str()`
+* Look at the summary of the dataset using the `summary()` 
+* Checking for 'NA' values
+
+* Perform Exploratory Data Analysis:
+
+```{r}
+
+nrow(cars_data)         # Number of rows in the dataset
+ncol(cars_data)         # Number of columns in the dataset
+colnames(cars_data)     # Display the column names
+str(cars_data)          # Structure of the dataset
+summary(cars_data)      # Summary of the dataset
+
+```
+
+## Look for Missing Values
+```{r}
+sum(is.na(cars_data))
+
+```
+
+
+## Data Pre-Processing
+```{r}
+## Drop the Id, Model attributes:
+
+drop_cols <- c("Id","Model")
+cars_data[ ,drop_cols] <- NULL
+str(cars_data)
+
+```
+
+### Rename Age Column
+```{r}
+colnames(cars_data)[2] <- 'Age'
+str(cars_data)
+
+```
+
+## Scatter Plot
+
+* Plot the Dependent and  Independent variables
+
+- The type of plot used to see the relationship between two continuous variables is called as _*Scatter Plot*_
+
+```{r}
+
+# Plot the dependent and independent variables
+
+plot(cars_data$Age,cars_data$Price,
+      main = "Price vs. Age",
+     xlab = "Age of the car (months)",
+     ylab = "Price in $",
+     col = "blue")
+grid(10,10,lwd = 1,col='Black')
+
+
+```
+
+- What do you infer from the plot?
+
+## Covariance between the attributes
+
+```{r}
+
+cov(cars_data)      # Covariance between independent and dependent variable
+
+```
+* The covariance of the price of the car and age is -59136.11
+
+- What does the value of the covariance signify?
+
+## Correlation between the attributes
+
+* Correlation of two variables gives a very good estimate as to how the two variables change together, this also helps us have an idea as to how well a Linear Regression Model will be able to predict the dependent variable.
+
+```{r}
+
+cor_data = cor(cars_data[,c(1,2)])      # Correlation between independent and dependent variable
+cor_data
+
+```
+What does the value of the correlation signify?
+
+* The correlation coefficient of the price of the car and age is -0.8765905.
+* Since the value is close to 1 and has a -ve sign, we can conclude that the variables are negatively correlated.
+
+## Corrplot
+
+```{r}
+
+library(corrplot)
+corrplot(cor_data)
+#corrplot(cor_data, method = "number")
+
+```
+
+
+## Model Building
+
+### Train Test Split (70:30) - Split the data into train and test datasets
+
+```{r}
+set.seed(123)
+rows = seq(1, nrow(cars_data),1)
+trainRows = sample(rows,(70*nrow(cars_data))/100)
+cars_train = cars_data[trainRows,] 
+cars_test = cars_data[-trainRows,]
+nrow(cars_train)
+nrow(cars_test)
+```
+
+## Building the Linear Regression Model
+
+* lm function is used to fit linear models
+
+```{r}
+
+LinReg = lm(Price ~ Age, data = cars_train)
+coefficients(LinReg)
+
+```
+
+- Summary displays the following: 
+    * Formula given (Call) - Shows the function call used to compute the regression model.
+    * Residuals. Provide a quick view of the distribution of the residuals, which by definition have a mean zero.
+    * Coefficients and the test statistic values. Shows the regression beta coefficients and their statistical significance. Predictor variables, that are significantly associated to the outcome variable, are marked by stars.
+    * Residual Standard Error (RSE)
+    * Multiple R- Squared (which we generally refer to as R squared or Co-efficient of Determination)
+    * F statistic - Test for Model
+    
+  - The statistical hypothesis is as follows :
+  
+    * Null Hypothesis (H0): the coefficients (slope) are equal to zero (i.e., no relationship between x and y)
+    * Alternative Hypothesis (H1): the coefficients (slope) are not equal to zero (i.e., there is some relationship between x and y)
+
+### Read the model summary
+
+```{r}
+## Summary of the linear model
+summary(LinReg)
+
+```
+
+- Try answering these questions (Interpreting model output) -
+    1. Is the Slope significant?
+    2. Is the Model significant?
+    3. What is the predictive power of the model (R-squared)?
+    
+- In our example, both the p-values for the intercept and the predictor variable are highly significant, so we can reject the null hypothesis and accept the alternative hypothesis, which means that there is a significant association between the predictor and the outcome variables.
+
+### Plot the data points and the line of best fit
+
+```{r}
+plot(cars_train$Age,cars_train$Price,xlab="Age of the Car",ylab="Price in ($)",main="Car Price Vs. Age: Best fit line", col= "blue")
+abline(LinReg,col="red",lwd=1)       # The function adds straight line to a plot
+
+```
+
+## Optional for info : 
+```{r}
+#To extract the coefficients:
+
+coefficients(LinReg)
+coefficients(LinReg)[1]
+coefficients(LinReg)[2]
+
+```
+
+## Extracting residuals and fitted values
+
+```{r}
+
+# To extract the residuals:
+head(LinReg$residuals)
+
+# To extract the predictions
+head(LinReg$fitted.values)
+
+```
+
+## Residual Analysis
+
+* In R four diagnostic plots can be obtained by calling the plot function on fitted model obtained using lm
+
+### Validity of linear regression assumptions
+
+
+```{r}
+
+par(mfrow = c(2,2))                         # par{graphics} helps us to Set the Graphical Parameters
+plot(LinReg,lwd =1,col = 'light green')     # Check for validity of linear regression assumptions
+
+```
+
+### Plot residuals vs fitted values
+- This will help us visualize how the residuals are distributed in relation to the fitted values
+
+```{r}
+plot(LinReg$fitted.values,LinReg$residuals,main = "Residual vs Predicted values", col = 'brown',lwd = 1,
+xlab ="Predicted Values / Fitted Values", ylab = "Residuals")
+abline(h = 0,col = 'blue',lwd=2)
+grid(10,10,lwd=1)
+```
+
+## Predict on testdata 
+
+```{r}
+test_prediction = predict(LinReg, cars_test)  # Fitted values
+test_actual = cars_test$Price                 # Actual values
+
+```
+
+## Performance Metrics
+
+Once we choose the model, we have to report performance metrics on the test data. We are going to report three error metrics for regression.
+
+### Error Metrics for Regression
+
+* Mean Absolute Error (MAE)
+
+Create a function called mae that measures the mean absolute error, given the actual and predicted points.
+
+$$MAE = \dfrac{1}{n}\times\sum_{i = 1}^{n}|y_{i} - \hat{y_{i}}|$$
+```{r}
+
+# We can create a function which would compute the error if we pass on two parameters to it.
+
+mae <- function(actual, predicted){
+  
+  error <- actual - predicted
+  
+  mean(abs(error))
+  
+}
+
+```
+
+* Mean Squared Error (MSE)
+
+Create a function called mse that measures the mean squared error, given the actual and predicted points.
+
+$$MSE = \dfrac{1}{n}\times\sum_{i = 1}^{n}(y_{i} - \hat{y_{i}})^2$$
+
+```{r}
+
+mse <- function(actual, predicted){
+  
+  error <- actual - predicted
+  
+  mean(error^2)
+  
+}
+
+```
+
+* Root Mean Squared Error (RMSE)
+
+Create a function called rmse that measures the root mean squared error, given the actual and predicted points.
+
+$$RMSE = \sqrt{\dfrac{1}{n}\times\sum_{i = 1}^{n}(y_{i} - \hat{y_{i}})^2}$$
+
+```{r}
+
+rmse <- function(actual, predicted){
+  
+  error <- actual - predicted
+  
+  sqrt(mean(error^2))
+  
+}
+
+```
+
+### Report Performance Metrics
+
+Report performance metrics obtained by using the chosen model on the test data.
+
+```{r}
+library(DMwR)
+#Error verification on train data
+regr.eval(cars_train$Price, LinReg$fitted.values)
+
+#Error verification on test data
+regr.eval(test_actual, test_prediction)
+```
+
+## Confidence and Prediction Intervals
+- Confidence Intervals talk about the average values intervals
+- Prediction Intervals talk about the all individual values intervals
+```{r}
+Conf_Pred = data.frame(predict(LinReg, cars_test, interval="confidence",level=0.95))
+Pred_Pred = data.frame(predict(LinReg, cars_test, interval="prediction",level=0.95))
+
+names(Conf_Pred)
+
+```
+
+```{r}
+plot(cars_test$Age, cars_test$Price,main = "Price and Age, with Regression Line and Intervals" ,xlab = "Age (Years)", ylab = "Price  ($)", col = 'brown')
+
+points(cars_test$Age,Conf_Pred$fit,type="l", col="green", lwd=2)
+points(cars_test$Age,Conf_Pred$lwr,pch="-", col="red", lwd=4)
+points(cars_test$Age,Conf_Pred$upr,pch="-", col="red", lwd=4)
+points(cars_test$Age,Pred_Pred$lwr,pch="-", col="blue", lwd=4)
+points(cars_test$Age,Pred_Pred$upr,pch="-", col="blue", lwd=4)
+grid(10,10,lwd =1)
+```
+
+- Confidence intervals tell you about how well you have determined the mean. Assume that the data really are randomly sampled from a Gaussian distribution. If you do  this many times, and calculate a confidence interval of the mean from each sample,  you'd expect about 95 % of those intervals to include the true value of the  population mean. The key point is that the confidence interval tells you about the likely location of the true population parameter.
+
+- Prediction intervals tell you where you can expect to see the next data point sampled. Assume that the data really are randomly sampled from a Gaussian distribution. Collect a sample of data and calculate a prediction interval. Then sample one more value from the population. If you do this many times, you'd expect that next value to lie within  that prediction interval in 95% of the samples.The key point is that the prediction  interval tells you about the distribution of values, not the uncertainty in determining  the population mean
+
+
+
+

@@ -1,0 +1,87 @@
+---
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+**NOTE** Before starting this assignment please remember to clear your environment, you can do that by running the following code chunk
+
+```{r}
+rm(list = ls(all=TRUE))
+```
+
+# Problem
+* To predict the Employment rate in Wisconsin.
+
+# Data
+* Monthly Milk Production in US (Pounds per cow)
+* Employment rate in Wisconsin (In Thousands)
+
+# Problem Understanding and Approach
+* As employment rate in wisconsin is numeric attribute it is regression problem.
+* As there is only one independent attribute, lets apply simple linear regression.
+
+# Reading the Data
+```{r}
+data = read.csv(file="srdata.csv", header=TRUE)
+```
+
+# Look at first 6 and last 6 records
+# Summary statistics
+```{r}
+head(data)
+tail(data)
+
+summary(data)
+```
+
+# Simple Linear Regression
+* Ignore Year_Month attribute. 
+* Building a Simple Linear Regression model to with Employment data as target and Milk Production as independent
+```{r}
+lr = lm(Wisconsin_Employment_Rate~Milk_Production, data)
+summary(lr)
+```
+
+# Understanding the model
+* We can observe that R^2^ is decent for this problem.
+* p-value is low for Milk_Production attribute.
+
+# Observations
+
+Something look fishy, because target and indepedent attribute(s) are not logically related, but model is showing otherwise.
+
+
+```{r}
+ts.plot(as.ts(data$Wisconsin_Employment_Rate), 
+        as.ts(data$Milk_Production),
+        ylab="Wisconsin Employent vs Milk production per cow")
+```
+
+```{r}
+cor(data$Wisconsin_Employment_Rate, data$Milk_Production)
+```
+
+Certainly, there is correlation between the variables, but there is no causation.
+
+The good model is because of **correlation** between variables and not because of **causation**.
+
+# Spurious Regression
+* Spurious Regression is a regression that provides misleading statistical evidence of a linear relationship between independent non-stationary variables
+* Milk_Data and Emp_Data has a strong trend 
+* Any other variable with such a trend will also show larger R^2^
+* It shows apparent relationship between two variables but in reality it doesn't exist
+
+```{r}
+library(forecast)
+
+ndiffs(data$Wisconsin_Employment_Rate)
+ndiffs(data$Milk_Production)
+```
+
+```{r}
+lr_diff = lm(diff(data$Wisconsin_Employment_Rate, lag=1)~diff(data$Milk_Production, lag=1))
+summary(lr_diff)
+```

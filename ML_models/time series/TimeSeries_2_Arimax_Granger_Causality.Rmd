@@ -1,0 +1,357 @@
+---
+title : ARIMAX and Granger Causality
+output:
+  html_document:
+    toc: yes
+  html_notebook:
+    fig_caption : yes
+    highlight   : tango
+    theme       : united
+    toc         : yes
+    toc_float   : yes
+---
+
+# Problem Description
+
+Predict weekly sales quantity of the item, using retail store data
+
+## Reading and Understanding Data
+
+### Clear the Global Environment
+```{r}
+rm(list=ls(all=TRUE))
+```
+
+### Load required R library
+```{r}
+library(caret)
+library(forecast)
+library(DMwR)
+```
+
+###  Read ArimaxData.csv file
+```{r,}
+PATH = getwd()
+setwd(PATH)
+data = read.csv("ArimaxData.csv")
+rm(PATH)
+```
+
+### Look at the first and last 6 records using head and tail commands
+```{r, echo=T}
+head(data, 6)
+
+tail(data, 6)
+```
+
+### Explore and understand the data
+
+```{r, echo=T}
+## Dimension of the Data set
+dim(data)
+
+## Look at the summary statistics
+summary(data)
+```
+
+### Look at the structure of the data
+```{r, echo=T}
+str(data)
+```
+
+### Convert attributes into appropriate type
+```{r, echo=T}
+data$temperaturebins = as.factor(data$temperaturebins)
+str(data)
+```
+
+```{r, echo=T}
+# Summary of the data
+summary(data)
+
+# Re-look at the first 6 records
+head(data)
+```
+
+### ARIMAX accepts only numerics attribute. So, convert categorial attributes to numeric using dummification
+* Since the dataframe   both Categorical and Numeric datatypes, Create two arrays having Numeric and Categorical Column names.
+* Dummify categorical columns
+* Merge Numeric columns with dummified columns.
+```{r, echo=T}
+
+names(data)
+c("weeklyPromotion", "temperaturebins")
+setdiff(names(data), c("weeklyPromotion", "temperaturebins"))
+
+dataNum = data[,setdiff(names(data), c("weeklyPromotion", "temperaturebins"))]
+head(dataNum)
+
+
+dummyModel  = dummyVars(~weeklyPromotion+temperaturebins, data)
+dataCat2Num = predict(dummyModel, data)
+
+head(dataCat2Num)
+
+data = cbind(dataNum, dataCat2Num)
+head(data)
+str(data)
+
+```
+
+### Split the data into Train and Test.
+```{r, echo=T}
+noOfWeekstoForcast = 4
+trainRowID = 1:(nrow(data) - noOfWeekstoForcast)
+trainData = data[trainRowID,]
+testData = data[-trainRowID,]
+rm(trainRowID, data)
+```
+
+### Verify Train and Test counts
+```{r, echo=T}
+nrow(trainData)
+nrow(testData)
+```
+
+### Create Timeseries Objects
+```{r, echo=T}
+trainTS = ts(trainData$quantityPerWeek, frequency = 53, start = c(2014, 1))
+testTS = ts(testData$quantityPerWeek, frequency = 53, start = c(2016, 46))
+```
+
+### Plot train Data
+```{r, echo=T}
+ts.plot(trainTS)
+plot(decompose(trainTS))
+```
+
+# Model Building
+
+## Holt-Winters Model
+
+### Build Holt-Winters Model
+```{r, echo=T}
+hw_Model = HoltWinters(trainTS)
+hw_Model
+```
+
+### Predictions of Hold-Winters on train data
+```{r, echo=T}
+train_HW_pred = hw_Model$fitted
+train_HW_pred
+```
+### Performance of Hold-Winters on train data
+```{r, echo=T}
+err_HW_Train = regr.eval(trainData[nrow(trainData)-53:nrow(trainData),]$quantityPerWeek, train_HW_pred[,1])
+err_HW_Train
+```
+
+### Forcasting using the model
+```{r, echo=T}
+test_HW_pred = forecast(hw_Model, noOfWeekstoForcast)
+test_HW_pred
+plot(test_HW_pred)
+
+```
+
+### Performance on Test data
+```{r, echo=T}
+err_HW_Test = regr.eval(testData$quantityPerWeek, data.frame(test_HW_pred)$Point.Forecast)
+err_HW_Test
+```
+
+
+## ARIMA model
+
+### Build Arima Model using auto.arima()
+```{r, echo=T}
+arima_Model = auto.arima(trainTS)
+summary(arima_Model)
+arimaorder(arima_Model)
+```
+
+### Predictions on Train data
+```{r, echo=T}
+train_Arima_Pred = fitted(arima_Model)
+train_Arima_Pred
+```
+
+### Performance on Train data
+```{r, echo=T}
+err_Arima_Train = regr.eval(trainData$quantityPerWeek, data.frame(train_Arima_Pred)$Point.Forecast)
+err_Arima_Train
+```
+
+### Forecast using the Arima model
+```{r, echo=T}
+test_Arima_Pred = forecast(arima_Model, h=noOfWeekstoForcast)
+test_Arima_Pred
+
+plot(test_Arima_Pred)
+```
+
+### Performance on Train data
+```{r, echo=T}
+err_Arima_Test = regr.eval(testData$quantityPerWeek, data.frame(test_Arima_Pred)$Point.Forecast)
+err_Arima_Test
+
+```
+
+## Arimax Model
+
+### Build a Arimax model using exogenous variables
+```{r, echo=T}
+arimax_Model_1 = auto.arima(trainTS, xreg=as.matrix(trainData[,c(4,5,8,13,15,16)]))
+summary(arimax_Model_1)
+arimaorder(arimax_Model_1)
+```
+
+
+### Predictions on Train data
+```{r, echo=T}
+train_Arimax_Pred_1 = fitted(arimax_Model_1)
+train_Arimax_Pred_1
+```
+
+
+### Performance on Train data
+```{r, echo=T}
+err_Arimax_Train_1 = regr.eval(trainData$quantityPerWeek, train_Arimax_Pred_1)
+err_Arimax_Train_1
+```
+
+
+### Forecast and plot using Arimax model
+```{r, echo=T}
+colnames(testData)
+test_Arimax_Pred_1 = forecast(arimax_Model_1, h=noOfWeekstoForcast, xreg=as.matrix(testData[,c(4,5,8,13,15,16)]))
+test_Arimax_Pred_1
+
+plot(test_Arimax_Pred_1)
+```
+
+
+### Performance on Test data
+```{r, echo=T}
+err_Arimax_Test_1 = regr.eval(testData$quantityPerWeek, data.frame(test_Arimax_Pred_1)$Point.Forecast)
+err_Arimax_Test_1
+
+```
+
+
+### Performance on all models on Train and Test Data
+```{r, echo=T}
+#H oltwinters
+
+err_HW_Train
+err_HW_Test
+
+# Arima
+err_Arima_Train
+err_Arima_Test
+
+#Arimax
+err_Arimax_Train_1
+err_Arimax_Test_1
+```
+
+## Improving the ARIMAX model
+
+### import lmtest and vars libraries 
+```{r, echo=T}
+library(lmtest)
+
+#install.packages("vars")
+library(vars)
+
+ts.plot(as.ts(trainData$NoOfWeeklyPromotion), as.ts(trainData$quantityPerWeek))
+```
+
+### plot the other numeric variables
+```{r, echo=T}
+ts.plot(as.ts(scale(trainData$NoOfWeeklyPromotion) + 5), as.ts(scale(trainData$quantityPerWeek)))
+ts.plot(as.ts(scale(trainData$FractionOfWeeklyPriceChange) + 5), as.ts(scale(trainData$quantityPerWeek)))
+ts.plot(as.ts(scale(trainData$AverageWeeklyPriceChange) + 5), as.ts(scale(trainData$quantityPerWeek)))
+ts.plot(as.ts(scale(trainData$AverageWeeklyPriceChangePer) + 5), as.ts(scale(trainData$quantityPerWeek)))
+ts.plot(as.ts(scale(trainData$meanTemperatureOfWeek) + 5), as.ts(scale(trainData$quantityPerWeek)))
+```
+
+
+### Number of differences required for target variable to be stationary
+```{r, echo=T}
+ndiffs(trainData$quantityPerWeek)
+```
+```{r, echo=T}
+ndiffs(trainData$NoOfWeeklyPromotion)
+ndiffs(trainData$FractionOfWeeklyPriceChange)
+ndiffs(trainData$AverageWeeklyPriceChange)
+ndiffs(trainData$AverageWeeklyPriceChangePer)
+ndiffs(trainData$meanTemperatureOfWeek)
+```
+
+```{r, echo=T}
+ts.plot(as.ts(scale(diff(trainData$FractionOfWeeklyPriceChange)) + 5), as.ts(scale(trainData$quantityPerWeek)))
+ts.plot(as.ts(scale(diff(trainData$AverageWeeklyPriceChange)) + 5), as.ts(scale(trainData$quantityPerWeek)))
+ts.plot(as.ts(scale(diff(trainData$AverageWeeklyPriceChangePer)) + 5), as.ts(scale(trainData$quantityPerWeek)))
+```
+```{r, echo=T}
+VARselect(trainData$quantityPerWeek, exogen=trainData[,c(4,5,6,7,8)])
+```
+
+```{r, echo=T}
+grangertest(quantityPerWeek ~ NoOfWeeklyPromotion,data=trainData, order=10)
+grangertest(trainData[2:151,]$quantityPerWeek ~ diff(FractionOfWeeklyPriceChange, lag=1),data=trainData, order=10)
+grangertest(trainData[2:151,]$quantityPerWeek ~ diff(AverageWeeklyPriceChange,lag=1),data=trainData, order=10)
+grangertest(trainData[2:151,]$quantityPerWeek ~ diff(AverageWeeklyPriceChangePer,lag=1),data=trainData, order=10)
+grangertest(quantityPerWeek ~ meanTemperatureOfWeek,data=trainData, order=10)
+```
+
+
+```{r, echo=T}
+arimax_Model_2 = auto.arima(trainTS, xreg=as.matrix(trainData[,c(5,8,6)]))
+
+summary(arimax_Model_2)
+arimaorder(arimax_Model_2)
+```
+
+```{r, echo=T}
+train_Arimax_Pred_2 = fitted(arimax_Model_2)
+train_Arimax_Pred_2
+
+err_Arimax_Train_2 = regr.eval(trainData$quantityPerWeek, train_Arimax_Pred_2)
+err_Arimax_Train_2
+```
+
+```{r, echo=T}
+
+test_Arimax_Pred_2 = forecast(arimax_Model_2, h=noOfWeekstoForcast, xreg=as.matrix(testData[,c(5,8,6)]))
+test_Arimax_Pred_2
+
+plot(test_Arimax_Pred_2)
+```
+
+
+```{r, echo=T}
+err_Arimax_Test_2 = regr.eval(testData$quantityPerWeek, data.frame(test_Arimax_Pred_2)$Point.Forecast)
+err_Arimax_Test_2
+```
+
+
+```{r, echo=T}
+# Performance of all models on both train and test
+err_HW_Train
+err_HW_Test
+
+err_Arima_Train
+err_Arima_Test
+
+err_Arimax_Train_1
+err_Arimax_Test_1
+
+#Arimax
+err_Arimax_Train_2
+err_Arimax_Test_2
+```
+
+
+

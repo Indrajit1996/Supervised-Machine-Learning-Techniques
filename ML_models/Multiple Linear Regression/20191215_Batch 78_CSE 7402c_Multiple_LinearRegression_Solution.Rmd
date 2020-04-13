@@ -1,0 +1,487 @@
+---
+title: "Predicting the Prices of Homes in Boston"
+author: "Multiple Linear Regression INSOFE Lab Session"
+date: "r.sys.date()"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+### Agenda 
+
+* Get the data
+
+* Ask an interesting question
+
+* Explore the data
+
+* Data Pre-processing
+
+* Model the data
+
+* Evaluation
+
+### Data Description
+
+* The column/variable names' explanation is given below:
+
+1) __CRIM :__ Per capita Crime rate by town
+
+2) __ZN :__ Proportion of residential land zoned for lots over 25,000 sq.ft.
+
+3) __INDUS :__ Proportion of non-retail business acres per town
+
+4) __CHAS :___ Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)
+
+5) __NOX :__ nitric oxides concentration (parts per 10 million)
+
+6) __RM :__ average number of rooms per dwelling
+
+7) __AGE :__ proportion of owner-occupied units built prior to 1940
+
+8) __DIS :__ weighted distances to five Boston employment centres
+
+9) __RAD :__ index of accessibility to radial highways
+
+10) __TAX :__ full-value property-tax rate per $10,000
+
+11) __PTRATIO :__ pupil-teacher ratio by town
+
+12) __B :__ 1000(Bk - 0.63)^2 where Bk is the proportion of African-Americans by town
+
+13) __LSTAT :__ Percentage of the population in the lower economic status 
+
+14) __MEDV  :__ Median value of owner-occupied homes in multiples of $1000
+
+
+
+
+**NOTE** Before starting this assignment please remember to clear your environment, you can do that by running the following code chunk
+### Clear the environment
+```{r}
+
+rm(list = ls(all=TRUE))
+```
+
+### Load the required libraries
+```{r}
+library(dplyr)
+library(caret)
+library(modes)
+library(gtools)
+
+```
+
+### Reading & Understanding the Data
+
+* Make sure the dataset is located in your current working directory
+
+```{r}
+
+housing_data <- read.csv("housing_data.csv",header=T,sep=",")
+
+```
+
+* Use the str() function to get a feel for the dataset.
+
+```{r}
+
+str(housing_data)
+
+```
+#### Observation:
+* The dataset has 500 rows and 13 attributes and one tagret MV.
+* CHAS and RAD should be categorical just they are showing the numerical values
+
+### Converting into required Data Types
+```{r}
+housing_data$CHAS = as.factor(housing_data$CHAS)
+housing_data$RAD = as.factor(housing_data$RAD)
+```
+
+### View few rows of data from top and bottom
+* Take a look at the data using the "head()" and "tail()" functions
+
+```{r}
+
+head(housing_data)
+
+tail(housing_data)
+
+```
+
+
+### Ask and Explore interesting Questions
+
+1) __How does the proportion of African-Americans by town relate to the Median Value of owner-occupied homes?__
+
+2) __How does the nitric oxides concentration measured as ppm in the air relate to the Median Value of owner-occupied homes?__
+
+3) ????
+
+4) ????
+
+* So, let's get ready to predict the prices of houses!!
+
+# Exploratory Analysis
+
+## Summary Statistics
+
+* Understand the distribution of various variables in the datset using the "summary()" function
+
+```{r}
+
+summary(housing_data)
+
+```
+#### Observation
+* There are NA values in all the attributes except the target column.
+
+
+
+### Data Pre-processing
+
+* Today we will impute missing values and standardize the data __after__ splitting the data into train and test sets
+
+## Train/Test Split
+
+* 70/30 - Train/Test split
+
+```{r}
+
+set.seed(29)
+
+# the "sample()" function helps us to randomly sample 70% of the row indices of the dataset
+
+train_rows <- sample(x = 1:nrow(housing_data), size = 0.7*nrow(housing_data))
+
+# We use the above indices to subset the train and test sets from the data
+
+train_data <- housing_data[train_rows, ]
+
+test_data <- housing_data[-train_rows, ]
+
+```
+
+## Missing Values imputation
+
+* Find out the number of missing values in the dataset
+
+* Impute the missing values using the "preProcess()" function in conjunction with the "knnImpute" method
+
+```{r}
+#install.packages("caret")
+sum(is.na(train_data))
+
+library(caret)
+
+imputer_values <- preProcess(x = train_data, method = "medianImpute")
+
+sum(is.na(train_data))
+
+train_data <- predict(object = imputer_values, newdata = train_data)
+
+sum(is.na(train_data))
+
+sum(is.na(test_data))
+
+test_data <- predict(object = imputer_values, newdata = test_data)
+
+sum(is.na(test_data))
+```
+
+### Imputing the categorical values with the mode
+
+```{r}
+
+library(DMwR)
+train_data = centralImputation(train_data)
+test_data = centralImputation(test_data)
+```
+
+
+### Scatter Plots
+
+* A few bi-variate relationships are plotted below, but you are encouraged to explore the dataset in more detail
+
+```{r fig.height= 8, fig.width = 9}
+
+par(mfrow = c(2,2))
+
+plot(housing_data$LSTAT, housing_data$MV, ylab = "Median House Price", xlab = "Percentage of people in the lower economic strata", main = "Housing Price vs Status")
+
+plot(housing_data$CRIM, housing_data$MV, ylab = "Median House Price", xlab = "Per capita crime by town", main = "Housing Price vs Per Capita Crime")
+
+plot(housing_data$NOX, housing_data$MV, ylab = "Median House Price", xlab = "Nitric Oxide Concentration in ppm", main = "Housing Price vs NOX concentration in ppm")
+
+plot(housing_data$INDUS, housing_data$MV, ylab = "Median House Price", xlab = "Proportion of non-retail business acres per town", main = "Housing Price vs Non-retail business area")
+```
+### Split the numerical and categorical attributes
+```{r}
+cols = colnames(train_data[,!names(train_data)%in%c("MV")])
+numAttr = c()
+catAttr = c()
+for (i in cols){
+  if (is.numeric(train_data[,c(i)])!=T){
+    catAttr = c(catAttr,i)
+  }else 
+  numAttr = c(numAttr,i)
+}
+cat("\n The Categorical Attributes =",catAttr)
+cat("\n The Numerical Attributes =  ",numAttr)
+
+```
+
+
+### Correlation Plot for Numerical Attributes
+
+* Let's have a look at the various correlations between the numerical variables in the dataset
+
+```{r fig.height= 8, fig.width = 9}
+#install.packages("corrplot")
+library(corrplot)
+
+corrplot(cor(housing_data[,numAttr], use = "complete.obs"), method = "number")
+
+```
+#### Observation:
+* There are correlations which have high magnitude but with both directions 
+* Example NOX and INDUS are positively correlated,DIS and Age
+* LSTAT and MV are having strong ngeative correlation
+* "Correlation is not a causation" we have to check for the mutual effects of the numerical attributes and hence we are not removing any attribute here.
+
+### Chisquare test on Categorical Attributes
+```{r}
+contingency = table(train_data$CHAS,train_data$RAD)
+chisq.test(contingency)
+```
+#### Observation:
+* Null Hypothesis in Chisquare test for independence is the two attributes are independent.
+* Since pValue is 0.44 which is greater than 0.05 we have to accept the null hypothesis that they are independent.
+
+
+
+### Standardizing the Data
+
+* We will use the Caret pakcage to standardize the data after the split using the __"preProcess()"__ function
+
+* It saves the metrics such as mean and standard deviation used for calculating the standardized value by creating a model object
+
+* We can then use the model object in the __"predict()"__ function to standardize any other unseen dataset with the same distribuiton and variables
+
+```{r}
+
+library(caret)
+
+# The "preProcess()" function creates a model object required for standardizing unseen data
+
+# Do not standardize the target variable
+
+std_model <- preProcess(train_data[, numAttr], method = c("center", "scale"))
+
+# The predict() function is used to standardize any other unseen data
+
+train_data[, numAttr] <- predict(object = std_model, newdata = train_data[, numAttr])
+
+test_data[, numAttr] <- predict(object = std_model, newdata = test_data[,numAttr])
+
+```
+
+
+# Modelling the Data
+
+## Basic Model
+
+* The "." adds all the variables other than the response variable while building the model.
+
+```{r}
+
+model_basic <- lm(formula = MV~. , data = train_data)
+
+summary(model_basic)
+
+par(mfrow = c(2,2))
+
+plot(model_basic)
+
+```
+
+## stepAIC model
+
+* "stepAIC()" is a function in the MASS package
+
+* stepAIC uses AIC (Akaike information criterion) to either drop variables ("backward" direction) or add variables ("forward" direction) from the model
+
+```{r}
+
+library(MASS)
+
+model_aic <- stepAIC(model_basic, direction = "both")
+
+summary(model_aic)
+
+par(mfrow = c(2,2))
+
+plot(model_aic)
+
+```
+
+## Modifying the Model with the VIF
+
+**Variance Inflation Factor :**
+
+$$VIF_{k} = \dfrac{1}{1 - R_{k}^2}$$
+
+$R_{k}^2$ is the R^2-value obtained by regressing the kth predictor on the remaining predictors. VIF gives us an idea of multi-collinearity
+
+* Every explanatory variable would have a VIF score
+
+* A VIF > 4 means that there are signs of multi-collinearity and anything greater than 10 means that an explanatory variable should be dropped
+
+* We use the "vif()" function from the car package. 
+
+```{r}
+
+library(car)
+
+vif(model_basic)
+
+vif(model_aic)
+
+```
+
+* After applying the stepAIC, the VIF values have slightly reduced, but the variables "RAD" and "TAX" have VIF values higher than 4
+
+
+* let's now remove the "TAX" variable, as it is the lesser significant of the two
+
+* Build another model without the "TAX" variable, and take a look at the VIFs
+
+
+```{r}
+
+model3 <- lm(formula = MV ~ CRIM + ZN + CHAS + NOX + RM + DIS + RAD + PT + B + LSTAT, data = train_data)
+
+summary(model3)
+
+par(mfrow = c(2,2))
+
+plot(model3)
+
+vif(model3)
+
+```
+
+
+# Evaluation and Selection of Model
+
+## Picking the Right Model
+
+* The third model built after verifying the vif scores has a similar adjusted R^2 score compared to the previous models with significantly lower no. of explanatory variables and inter-variable interactions.
+
+* The VIF values of the predictors in the third model are lower when compared to the the other two models
+
+* Due to the above two reasons we pick the third model
+
+# Communication
+
+## Prediction
+
+Predict the Housing prices of the unseen boston housing data, using the chosen model.
+
+```{r}
+
+preds_model <- predict(model3, test_data[, !(names(test_data) %in% c("MV"))])
+
+```
+
+## Performance Metrics
+
+Once we choose the model we have to report performance metrics on the test data. We are going to report three error metrics for regression.
+
+### Error Metrics for Regression
+
+* Mean Absolute Error (MAE):
+
+$$MAE = \dfrac{1}{n}\times|\sum_{i = 1}^{n}y_{i} - \hat{y_{i}}|$$
+
+
+* Mean Squared Error (MSE):
+
+$$MSE = \dfrac{1}{n}\times(\sum_{i = 1}^{n}y_{i} - \hat{y_{i}})^2$$
+
+
+* Root Mean Squared Error (RMSE):
+
+$$RMSE = \sqrt{\dfrac{1}{n}\times(\sum_{i = 1}^{n}y_{i} - \hat{y_{i}})^2}$$
+
+
+* Mean Absolute Percentage Error (MAPE):
+
+$$MAPE = \dfrac{100}{n}\times\mid\dfrac{\sum_{i = 1}^{n}y_{i} - \hat{y_{i}}}{y_{i}}\mid$$
+
+
+### Report Performance Metrics
+
+* Report performance metrics obtained by using the chosen model on the test data
+
+```{r}
+
+library(DMwR)
+
+regr.eval(test_data$MV, preds_model)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,146 @@
+---
+title: "Predicting Labour Wages using Elastic Net Regression"
+author: "Insofe Labs"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+
+# ElasticNet Regression
+
+$$\text{Residual Mean Square Error}+\ (1-\alpha) \cdot \text{Ridge Penalty}+ \alpha\cdot \text{LASSO Penalty}$$
+
+# Read and Understand the data
+
+```{r}
+
+labour_data <- read.csv("labour_income.csv")
+
+str(labour_data)
+
+summary(labour_data)
+
+```
+
+# Data Pre-processing
+
+## Train-Test Split
+
+* Split the data into train and test
+
+```{r}
+
+set.seed(007)
+
+train_rows <- sample(x = seq(1, nrow(labour_data), 1), size = 0.7*nrow(labour_data))
+
+train_data <- labour_data[train_rows, ]
+
+test_data <- labour_data[-train_rows, ]
+
+```
+
+## Standardize the Data
+
+* Standardize the continuous independent variables
+
+```{r}
+
+library(caret)
+
+std_obj <- preProcess(x = train_data[, !colnames(train_data) %in% c("wages")],
+                      method = c("center", "scale"))
+
+train_std_data <- predict(std_obj, train_data)
+
+test_std_data <- predict(std_obj, test_data)
+
+```
+
+
+## Dummify the Data
+
+* Use the dummyVars() function from caret to convert sex and age into dummy variables
+
+```{r}
+
+dummy_obj <- dummyVars( ~ . , train_std_data)
+
+train_dummy_data <- as.data.frame(predict(dummy_obj, train_std_data))
+
+test_dummy_data <- as.data.frame(predict(dummy_obj, test_std_data))
+
+```
+
+
+# Hyper-parameter Tuning using CARET for Elastic Net
+
+```{r}
+
+library(glmnet)
+
+sampling_strategy <- trainControl(method = "repeatedcv", number = 5, repeats = 3)
+
+elastic_net_model <- train(wages ~ ., train_dummy_data,
+                           method = "glmnet", 
+                           trControl = sampling_strategy,
+                           metric = "RMSE",
+                           tuneGrid = 
+                             expand.grid(.alpha = c(0.0500000, 0.1178571, 0.1857143, 0.2535714, 0.3214286, 0.3892857, 0.4571429, 0.5250000, 0.5928571, 0.6607143, 0.7285714, 0.7964286, 0.8642857, 0.9321429, 1.0000000), 
+                                         #seq(.05, 1, length = 15),
+                                         
+                                  .lambda = c(0.1, 0.2, 0.3, 0.4, 0.5)
+                                         #c((1:5)/10)
+                                    )
+                           )
+
+```
+
+```{r}
+
+plot(elastic_net_model)
+
+```
+
+
+## Evaluating the Final Elastic Net Regression Model
+
+* Use the model to predict on test data
+
+```{r}
+
+preds_elastic <- predict(elastic_net_model, test_dummy_data)
+
+```
+
+
+# Model Performance Evaluation
+
+## Elastic Net Regression Model Metrics
+
+```{r}
+
+library(DMwR)
+
+regr.eval(trues = test_dummy_data[, 1], preds = preds_elastic)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

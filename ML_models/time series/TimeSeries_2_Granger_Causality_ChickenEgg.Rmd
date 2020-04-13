@@ -1,0 +1,128 @@
+---
+title: "Granger_Causality_lab"
+description: "INSOFE Lab Activity on Granger Causality Test"
+date: ""
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+Granger Causality: Given two sets of time series data, x and y, granger-causality is a method which attempts to determine whether one series is likely to influence change in the other. This is accomplished by taking different lags of one series and using that to model the change in the second series.
+
+
+**NOTE** Before starting this assignment please remember to clear your environment, you can do that by running the following code chunk
+
+
+```{r}
+rm(list = ls(all=TRUE))
+```
+
+
+# Agenda 
+
+* Read the data
+
+* Make series stationary
+
+* Test the granger Causility
+
+## Data Description & Problem statement
+
+* This data is from U.S. Department of Agriculture. It consists of two time series from 1930 to 1983, one of U.S. egg production and the other the estimated U.S. chicken population.
+
+* The dataset has the following attributes:
+
+1: Year: The Year in which data point has been collected.
+2: chicken: Polulation of the chicken across US in the same year.
+3: egg: Egg Produciton in the same year. 
+
+# Reading & Understanding the Data
+
+## Data Domain and Format
+
+* The data given to you will be in a .csv file.
+
+* The values on each line of the dataset are separated by ","
+
+* Read in the data using the "read.csv()" function.
+
+```{r}
+chickegg = read.csv("chickegg.csv",header=TRUE,sep=",")
+```
+
+## Understand the data
+
+* Use the str() function to get the dimensions and types of attributes in the dataset
+
+* The dataset has 54 observations and 3 variables
+
+
+```{r}
+
+str(chickegg)
+
+```
+
+* Use the summary() function to understand the distribution of variables in the dataset
+
+```{r}
+
+summary(chickegg)
+
+```
+
+## Make series stationary
+
+* Check if the data is stationary or not. 
+* The plots provide little information other than the data is likely not stationary.
+
+```{r}
+attach(chickegg)
+par(mfrow=c(2,1))
+plot.ts(chicken)
+plot.ts(egg)
+```
+ * Check number of difference is required to make the data stationary. 
+ 
+```{r}
+library(forecast)
+
+ndiffs(chicken)
+ndiffs(egg)
+```
+ 
+ * Get the differenced time series
+ * by looking, wee could say that the series are stationary. 
+ 
+```{r}
+dchick <- diff(chicken)
+degg <- diff(egg)
+
+plot.ts(dchick)
+plot.ts(degg)
+```
+ 
+## Test the granger Causility
+ 
+ * There are several ways to find the optimal lag but lets consider 4th lag as of now. 
+ * Do eggs granger cause chickens?
+  - H0: eggs does not granger-cause chicken
+  - H1: eggs granger-cause chicken
+```{r}
+library(lmtest)
+grangertest(dchick ~ degg, order=4)
+```
+ 
+  * p value is very low "0.006414", it means eggs are granger causing chicken. 
+
+ 
+ * Do chickens granger cause eggs, at lag 4?
+   - H0: chicken does not granger-cause eggs
+   - H1: chicken granger-cause eggs
+   
+```{r}
+grangertest(degg ~ dchick, order=4)
+```
+  * p value is considerably high thus chickens does not granger cause eggs.
